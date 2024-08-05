@@ -43,9 +43,6 @@
 #define USB_XYLANTA_SAINT3_VENDOR_ID 0x16d0
 #define USB_XYLANTA_SAINT3_PRODUCT_ID 0x0f30
 
-#define GS_USB_ENDPOINT_IN 1
-#define GS_USB_ENDPOINT_OUT 2
-
 /* Timestamp 32 bit timer runs at 1 MHz (1 µs tick). Worker accounts
  * for timer overflow (will be after ~71 minutes)
  */
@@ -336,6 +333,9 @@ struct gs_usb {
 
 	unsigned int hf_size_rx;
 	u8 active_channels;
+
+	u8 ep_in;
+	u8 ep_out;
 };
 
 /* 'allocate' a tx context.
@@ -687,7 +687,7 @@ static void gs_usb_receive_bulk_callback(struct urb *urb)
 
 resubmit_urb:
 	usb_fill_bulk_urb(urb, parent->udev,
-			  usb_rcvbulkpipe(parent->udev, GS_USB_ENDPOINT_IN),
+			  usb_rcvbulkpipe(parent->udev, parent->ep_in),
 			  hf, dev->parent->hf_size_rx,
 			  gs_usb_receive_bulk_callback, parent);
 
@@ -819,7 +819,7 @@ static netdev_tx_t gs_can_start_xmit(struct sk_buff *skb,
 	}
 
 	usb_fill_bulk_urb(urb, dev->udev,
-			  usb_sndbulkpipe(dev->udev, GS_USB_ENDPOINT_OUT),
+			  usb_sndbulkpipe(dev->udev, dev->parent->ep_out),
 			  hf, dev->hf_size_tx,
 			  gs_usb_xmit_callback, txc);
 
@@ -926,7 +926,7 @@ static int gs_can_open(struct net_device *netdev)
 			usb_fill_bulk_urb(urb,
 					  dev->udev,
 					  usb_rcvbulkpipe(dev->udev,
-							  GS_USB_ENDPOINT_IN),
+							  dev->parent->ep_in),
 					  buf,
 					  dev->parent->hf_size_rx,
 					  gs_usb_receive_bulk_callback, parent);
@@ -1421,6 +1421,18 @@ static int gs_usb_probe(struct usb_interface *intf,
 	struct gs_device_config dconf;
 	unsigned int icount, i;
 	int rc;
+	struct usb_host_interface *host_iface;
+	struct usb_endpoint_descriptor *ep_in, *ep_out;
+
+	host_iface = intf->cur_altsetting;
+
+	/* Find common bulk endpoints reverse */
+	rc = usb_find_common_endpoints_reverse(host_iface, &ep_in, &ep_out, NULL,
+											NULL);
+	if (rc) {
+		dev_err(&intf->dev, "Required endpoints not found\n");
+		return rc;
+	}
 
 	/* send host config */
 	rc = usb_control_msg_send(udev, 0,
@@ -1465,6 +1477,10 @@ static int gs_usb_probe(struct usb_interface *intf,
 
 	usb_set_intfdata(intf, parent);
 	parent->udev = udev;
+
+	/* store the detected endpoints */
+	parent->ep_in = ep_in->bEndpointAddress;
+	parent->ep_out = ep_out->bEndpointAddress;
 
 	for (i = 0; i < icount; i++) {
 		unsigned int hf_size_rx = 0;
