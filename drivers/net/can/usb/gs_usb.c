@@ -1426,8 +1426,7 @@ static int gs_usb_probe(struct usb_interface *intf,
 	host_iface = intf->cur_altsetting;
 
 	/* Find common bulk endpoints reverse */
-	rc = usb_find_common_endpoints_reverse(host_iface, &ep_in, &ep_out, NULL,
-											NULL);
+	rc = usb_find_common_endpoints(host_iface, &ep_in, &ep_out, NULL, NULL);
 	if (rc) {
 		dev_err(&intf->dev, "Required endpoints not found\n");
 		return rc;
