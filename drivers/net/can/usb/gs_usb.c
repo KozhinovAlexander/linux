@@ -1412,6 +1412,8 @@ static int gs_usb_probe(struct usb_interface *intf,
 			const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
+	struct usb_endpoint_descriptor *ep_in, *ep_out;
+	struct usb_host_interface *host_iface;
 	struct gs_host_frame *hf;
 	struct gs_usb *parent;
 	struct gs_host_config hconf = {
@@ -1420,8 +1422,6 @@ static int gs_usb_probe(struct usb_interface *intf,
 	struct gs_device_config dconf;
 	unsigned int icount, i;
 	int rc;
-	struct usb_host_interface *host_iface;
-	struct usb_endpoint_descriptor *ep_in, *ep_out;
 
 	host_iface = intf->cur_altsetting;
 
